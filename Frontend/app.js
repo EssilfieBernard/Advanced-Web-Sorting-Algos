@@ -4,8 +4,11 @@ let currentEditingId = null;
 async function fetchOperations() {
     try {
         const response = await fetch(apiBaseUrl);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+
         const operations = await response.json();
         const operationsBody = document.getElementById('operations-body');
         operationsBody.innerHTML = '';
@@ -14,15 +17,15 @@ async function fetchOperations() {
             const row = document.createElement('tr');
             row.classList.add('hover:bg-gray-100', 'transition', 'duration-200');
             row.dataset.id = operation.id;
-            
+
             const typeCell = document.createElement('td');
-            typeCell.textContent = operation.type; 
+            typeCell.textContent = operation.type;
             typeCell.classList.add('p-3');
-            
+
             const dataCell = document.createElement('td');
-            dataCell.textContent = operation.data.join(', '); 
+            dataCell.textContent = operation.data.join(', ');
             dataCell.classList.add('p-3');
-            
+
             const resultCell = document.createElement('td');
             resultCell.textContent = operation.result ? operation.result.join(', ') : 'Not sorted yet';
             resultCell.classList.add('p-3');
@@ -47,7 +50,7 @@ async function fetchOperations() {
             row.appendChild(dataCell);
             row.appendChild(resultCell);
             row.appendChild(actionCell);
-            
+
             operationsBody.appendChild(row);
         });
     } catch (error) {
@@ -59,10 +62,14 @@ async function fetchOperations() {
 async function deleteOperation(id) {
     try {
         const response = await fetch(`${apiBaseUrl}/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
         });
 
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+
         await fetchOperations();
     } catch (error) {
         console.error('Error deleting operation:', error);
@@ -84,11 +91,11 @@ function startEditing(operation) {
 async function executeSort() {
     const selectedAlgorithm = document.getElementById('sort-select').value;
     const inputData = document.getElementById('data-input').value;
-    
+
     if (inputData === '') {
         alert("Please enter some data to sort.");
         return;
-    }    
+    }
 
     const dataArray = inputData.split(',').map(num => parseInt(num.trim()));
 
@@ -103,25 +110,28 @@ async function executeSort() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     type: selectedAlgorithm.toUpperCase(),
-                    data: dataArray
-                })
+                    data: dataArray,
+                }),
             });
         } else {
             response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
             });
         }
 
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+
         const result = await response.json();
         document.getElementById('sort-result').textContent = JSON.stringify(result, null, 2);
         await fetchOperations();
         resetEditingState();
     } catch (error) {
         console.error('Error executing sort:', error);
-        document.getElementById('sort-result').textContent = `Error: ${error.message}`;
+        document.getElementById('sort-result').textContent = `${error.message}`;
     }
 }
 

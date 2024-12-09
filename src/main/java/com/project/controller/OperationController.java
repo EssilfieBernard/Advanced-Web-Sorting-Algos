@@ -53,7 +53,7 @@ public class OperationController {
                     })
                     .toList();
         } catch (InvalidInputException e) {
-            throw e; // Custom exception to be handled globally
+            throw new InvalidInputException("Invalid input. Please enter only integers");
         }
 
         List<Integer> operation = operationService.createOperation(data, type);
