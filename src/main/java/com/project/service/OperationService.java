@@ -5,6 +5,7 @@ import com.project.algorithm.HeapSort;
 import com.project.algorithm.MergeSort;
 import com.project.algorithm.QuickSort;
 import com.project.algorithm.RadixSort;
+import com.project.exception.NullDataException;
 import com.project.model.Operation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -70,10 +71,10 @@ public class OperationService {
     public List<Integer> updateOperation(String id, Operation updatedOperation) {
         var operation = dataService.findById(id);
         if (operation == null)
-            throw new IllegalArgumentException("Operation not found with id: " + id);
+            throw new NullDataException("Operation not found with id: " + id);
 
         if (updatedOperation.getData() == null || updatedOperation.getData().isEmpty())
-            throw new IllegalArgumentException("Data cannot be null or empty");
+            throw new NullDataException("Data to sort cannot be null or empty");
 
         operation.setData(updatedOperation.getData());
         String type = updatedOperation.getType();
@@ -86,7 +87,7 @@ public class OperationService {
     public Operation deleteOperationById(String id) {
         Operation operation = dataService.removeById(id);
         if (operation == null)
-            throw new IllegalArgumentException("Operation not found with id: " + id);
+            throw new NullDataException("Operation not found with id: " + id);
         return operation;
     }
 
@@ -95,4 +96,5 @@ public class OperationService {
             if (number < 0)
                 throw new IllegalArgumentException("Radix Sort only supports non-negative integers.");
     }
+
 }

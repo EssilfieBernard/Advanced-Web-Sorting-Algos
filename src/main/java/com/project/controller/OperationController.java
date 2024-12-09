@@ -1,8 +1,13 @@
 package com.project.controller;
 
+import com.project.exception.InvalidInputException;
 import com.project.model.Operation;
 import com.project.service.OperationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.Link;
+import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -35,29 +40,29 @@ public class OperationController {
 
     @PostMapping(value = "/sort", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> sort(@RequestParam("stringData") String stringData, @RequestParam("type") String type) {
+        List<Integer> data;
         try {
-            List<Integer> data = Arrays.stream(stringData.split(","))
+            data = Arrays.stream(stringData.split(","))
                     .map(String::trim)
-                    .map(Integer::parseInt)
+                    .map(s -> {
+                        try {
+                            return Integer.parseInt(s);
+                        } catch (NumberFormatException e) {
+                            throw new InvalidInputException("Invalid input: '" + s + "' is not a valid integer.");
+                        }
+                    })
                     .toList();
-            List<Integer> operation = operationService.createOperation(data, type);
-            return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(operation);
-        }catch (Exception e) {
-            System.out.println("Error processing data: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } catch (InvalidInputException e) {
+            throw e; // Custom exception to be handled globally
         }
+
+        List<Integer> operation = operationService.createOperation(data, type);
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(operation);
     }
 
     @PutMapping("{id}")
     public ResponseEntity<List<Integer>> updateOperationById(@PathVariable String id, @RequestBody Operation operation) {
-        try {
-            return ResponseEntity.ok(operationService.updateOperation(id, operation));
-        }catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
-        }catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+        return ResponseEntity.ok(operationService.updateOperation(id, operation));
     }
 
 
@@ -68,8 +73,72 @@ public class OperationController {
     }
 
 
-    @GetMapping("greet")
-    public String greet() {
-        return "Hello World";
+    @GetMapping("/hateoas/getAllOperations")
+    public ResponseEntity<CollectionModel<EntityModel<Operation>>> getOperations() {
+        List<Operation> operations = operationService.getAllOperations();
+        List<EntityModel<Operation>> operationModels = operations.stream()
+                .map(operation -> EntityModel.of(operation,
+                        WebMvcLinkBuilder.linkTo(WebMvcLinkBuilder.methodOn(OperationController.class).getOperations()).withSelfRel()))
+                .toList();
+
+        CollectionModel<EntityModel<Operation>> collectionModel = CollectionModel.of(operationModels,
+                WebMvcLinkBuilder.linkTo(WebMvcLinkBuilder.methodOn(OperationController.class).getOperations()).withSelfRel());
+
+        return ResponseEntity.ok(collectionModel);
     }
+
+    @PostMapping(value = "/hateoas/sort", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<EntityModel<List<Integer>>> sortData(@RequestParam("stringData") String stringData, @RequestParam("type") String type) {
+        List<Integer> data;
+        try {
+            data = Arrays.stream(stringData.split(","))
+                    .map(String::trim)
+                    .map(s -> {
+                        try {
+                            return Integer.parseInt(s);
+                        } catch (NumberFormatException e) {
+                            throw new InvalidInputException("Invalid input: '" + s + "' is not a valid integer.");
+                        }
+                    })
+                    .toList();
+        } catch (InvalidInputException e) {
+            throw e; // Custom exception to be handled globally
+        }
+
+        List<Integer> sortedData = operationService.createOperation(data, type);
+        EntityModel<List<Integer>> resource = EntityModel.of(sortedData);
+
+        Link selfLink = WebMvcLinkBuilder.linkTo(WebMvcLinkBuilder.methodOn(OperationController.class).sortData(stringData, type)).withSelfRel();
+        resource.add(selfLink);
+
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(resource);
+    }
+
+    @PutMapping("/hateoas/updateOperation/{id}")
+    public ResponseEntity<EntityModel<List<Integer>>> updateOperation(@PathVariable String id, @RequestBody Operation operation) {
+        List<Integer> updatedOperation = operationService.updateOperation(id, operation);
+        EntityModel<List<Integer>> resource = EntityModel.of(updatedOperation);
+
+        Link selfLink = WebMvcLinkBuilder.linkTo(WebMvcLinkBuilder.methodOn(OperationController.class).updateOperation(id, operation)).withSelfRel();
+        Link allOperationsLink = WebMvcLinkBuilder.linkTo(WebMvcLinkBuilder.methodOn(OperationController.class).getOperations()).withRel("all-operations");
+
+        resource.add(selfLink);
+        resource.add(allOperationsLink);
+
+        return ResponseEntity.ok(resource);
+    }
+
+    @DeleteMapping("/hateoas/deleteOperation/{id}")
+    public ResponseEntity<EntityModel<Operation>> deleteOperation(@PathVariable String id) {
+        Operation deletedOperation = operationService.deleteOperationById(id);
+        EntityModel<Operation> resource = EntityModel.of(deletedOperation);
+
+        Link allOperationsLink = WebMvcLinkBuilder.linkTo(WebMvcLinkBuilder.methodOn(OperationController.class).getOperations()).withRel("all-operations");
+
+        resource.add(allOperationsLink);
+
+        return ResponseEntity.ok(resource);
+    }
+
+
 }
